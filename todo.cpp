@@ -40,7 +40,7 @@ int main(int argc, char** argv)
 	string category = "";
 	string todoFile = "todoFile";
 
-	while ((res = getopt(argc, argv, "a:c:e:f:hlr:s:t")) != -1) {
+	while ((res = getopt(argc, argv, "a:c:ef:hlr:s:t")) != -1) {
 		if (workmode != none) {
 			break;
 		}
@@ -73,12 +73,12 @@ int main(int argc, char** argv)
 			cout << "'-f'\tSet todoFile. Must be set before work mode!" << endl;
 			cout << "\tFor example:" << endl;
 			cout << "\t>todo -f ./todoFile -a film2watch" << endl;
-			cout << "'-e'\tclear todo list." << endl;
-			cout << "'-h'\tshow this help." << endl;
-			cout << "'-l'\tshow all todo items." << endl;
-			cout << "'-r'\tremove todo item." << endl;
-			cout << "'-s'\tshow item of todo category." << endl;
-			cout << "'-t'\tshow todo categories." << endl;
+			cout << "'-e'\tClear todo list." << endl;
+			cout << "'-h'\tShow this help." << endl;
+			cout << "'-l'\tShow all todo items." << endl;
+			cout << "'-r'\tRemove todo item." << endl;
+			cout << "'-s'\tShow item of todo category." << endl;
+			cout << "'-t'\tShow todo categories." << endl;
 		return 0;
 		case 'l':
 			workmode = showAll;
@@ -104,6 +104,13 @@ int main(int argc, char** argv)
 	switch (workmode) {
 	case add:
 		addTodoItem(todoFile, category);
+	break;
+	case erase: {
+		ofstream output(todoFile.c_str());
+		if (!output) { cerr << "Coldn't open file " << todoFile << endl; }
+		output << "";
+		output.close();
+	}
 	break;
 	case create: {
 		fstream fs(todoFile.c_str(), std::fstream::out | std::fstream::app);
