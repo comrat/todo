@@ -23,7 +23,6 @@ typedef vector<string>::const_iterator str_iter;
 enum mode {add, create, show, showAll, showCat, removeItem, erase, none};
 
 /********* Protitypes. ***********/
-
 void addTodoItem(const string &fileName, const string &category);
 
 void getCategoryItems(const string &fileName, const string &category, vector<string> &items);
@@ -187,9 +186,11 @@ void addTodoItem(const string &fileName, const string &category)
 	if (!output) {
 		cerr << "Coldn't open file " << fileName << endl;
 	}
-	for (str_iter idx = fileStrings->begin(); idx != fileStrings->end(); ++idx) {
-		output << *idx << endl;
+	for (int idx = 0; idx < fileStrings->size() - 1; ++idx) {
+		output << fileStrings->at(idx) << endl;
 	}
+	// Add last line without 'endl'.
+	output << fileStrings->at(fileStrings->size() - 1);
 	output.close();
 	delete fileStrings;
 }
