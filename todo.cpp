@@ -237,7 +237,7 @@ void removeTodoItem(const string &fileName, const string &category)
 	if (!input) {
 		cerr << "Coldn't open file " << fileName << endl;
 	}
-
+	cout << "Enter item to remove:" << endl;
 	string removeItem = "";
 	cin >> removeItem;
 	// Prevent adding '{' '}' symbols.
@@ -299,9 +299,11 @@ void removeTodoItem(const string &fileName, const string &category)
 	if (!output) {
 		cerr << "Coldn't open file " << fileName << endl;
 	}
-	for (str_iter idx = fileStrings->begin(); idx != fileStrings->end(); ++idx) {
-		output << *idx << endl;
+	for (int idx = 0; idx < fileStrings->size() - 1; ++idx) {
+		output << fileStrings->at(idx) << endl;
 	}
+	// Add last line without 'endl'.
+	output << fileStrings->at(fileStrings->size() - 1);
 	output.close();
 	delete fileStrings;
 }
