@@ -1,63 +1,49 @@
-/*********** Includes. ***********/
+#include "todo.h"
 #include <unistd.h>
+#include <sstream>
 #include <iostream>
-using std::cout;
-using std::cerr;
-using std::cin;
-using std::endl;
 #include <fstream>
+#include <string>
+#include <algorithm>
+
+using std::cout;
+using std::cin;
+using std::cerr;
+using std::endl;
 using std::ofstream;
 using std::ifstream;
 using std::fstream;
-#include <string>
 using std::string;
-using std::getline;
-#include <vector>
 using std::vector;
-using std::iterator;
+using std::find;
+
+void load(const string& fileName, TODOMap& map);
+void save(const string& fileName, TODOMap& map);
 
 
-/******* Type definition. ********/
-typedef vector<string>::const_iterator str_iter;
-
-enum mode {add, create, show, showAll, showCat, removeItem, erase, none};
-
-/********* Protitypes. ***********/
-void addTodoItem(const string &fileName, const string &category);
-
-void getCategoryItems(const string &fileName, const string &category, vector<string> &items);
-
-void removeTodoItem(const string &fileName, const string &category);
-
-void showCategory(const string &fileName, const string &category);
-
-/***** Programm enter point. *****/
 int main(int argc, char** argv)
 {
-	int res = 0;
-	mode workmode = none;
+	string fileName = "fileName";
 	string category = "";
-	string todoFile = "todoFile";
+	TODOMap	todoMap;
+	WorkMode workmode = none;
+	load(fileName, todoMap);
+	int res = 0;
 
-	while ((res = getopt(argc, argv, "a:c:ef:hlr:s:t")) != -1) {
-		if (workmode != none) {
+	while ((res = getopt(argc, argv, "a:ef:hlr:s:t")) != -1) {
+		if (workmode != none)
 			break;
-		}
 
 		switch (res) {
 		case 'a':
 			workmode = add;
 			category = optarg;
 		break;
-		case 'c':
-			workmode = create;
-			category = optarg;
-		break;
 		case 'e':
 			workmode = erase;
 		break;
 		case 'f':
-			todoFile = optarg;
+			fileName = optarg;
 		break;
 		case 'h':
 			cout << "todo - make a private todo-list! This application help to ";
@@ -66,12 +52,11 @@ int main(int argc, char** argv)
 			cout << "'-a'\tAdd todo item to todo category (category must be created)." << endl;
 			cout << "\tFor example:" << endl;
 			cout << "\t>todo -a film2watch." << endl;
-			cout << "'-c'\tCreate new todo category." << endl;
 			cout << "\tFor example:" << endl;
 			cout << "\t>todo -a film2watch." << endl;
-			cout << "'-f'\tSet todoFile. Must be set before work mode!" << endl;
+			cout << "'-f'\tSet processing file name. Must be set before work mode!" << endl;
 			cout << "\tFor example:" << endl;
-			cout << "\t>todo -f ./todoFile -a film2watch" << endl;
+			cout << "\t>todo -f ./todoFilename -a film2watch" << endl;
 			cout << "'-e'\tClear todo list." << endl;
 			cout << "'-h'\tShow this help." << endl;
 			cout << "'-l'\tShow all todo items." << endl;
@@ -101,224 +86,102 @@ int main(int argc, char** argv)
 	}
 
 	switch (workmode) {
-	case add:
-		addTodoItem(todoFile, category);
-	break;
-	case erase: {
-		ofstream output(todoFile.c_str());
-		if (!output) { cerr << "Coldn't open file " << todoFile << endl; }
-		output << "";
-		output.close();
+	case show:
+	{
+		for (std::vector<std::string>::const_iterator i = todoMap[category].begin(); i != todoMap[category].end(); ++i)
+			std::cout << (*i) << std::endl;
+		break;
 	}
-	break;
-	case create: {
-		fstream fs(todoFile.c_str(), std::fstream::out | std::fstream::app);
-		if (!fs) {
-			cerr << "Coldn't open file " << todoFile << endl;
-		}
-		fs << category << "{}" << endl;
-		fs.close();
-	}
-	break;
 	case showAll:
-	case show: {
-		vector<string> *items = new vector<string>();
-		getCategoryItems(todoFile, category, *items);
-		if (workmode == show) { cout << "Category '" << category << "' todo:" << endl; }
-		for (str_iter idx = items->begin(); idx != items->end(); ++idx) {
-			cout << "\t" << *idx << endl;
+	{
+		for (TODOIterator it = todoMap.begin(); it != todoMap.end(); ++it) {
+			std::cout << (*it).first << ":" << std::endl;
+			for (std::vector<std::string>::const_iterator i = (*it).second.begin(); i != (*it).second.end(); ++i)
+				std::cout << "\t" << (*i) << std::endl;
 		}
-		delete items;
+		break;
 	}
-	break;
-	case removeItem:
-		removeTodoItem(todoFile, category);
-	break;
+	case add:
+	{
+		cout << "Enter item name: " << endl;
+		string token;
+		cin >> token;
+		todoMap[category].push_back(token);
+		save(fileName, todoMap);
+		break;
+	}
 	case showCat:
-		showCategory(todoFile, category);
-	break;
+	{
+		for (TODOIterator it = todoMap.begin(); it != todoMap.end(); ++it)
+			std::cout << (*it).first << std::endl;
+		break;
 	}
+	case erase:
+	{
+		todoMap.clear();
+		save(fileName, todoMap);
+		break;
+	}
+	case removeItem:
+	{
+		cout << "Enter item name: " << endl;
+		string token;
+		cin >> token;
+		todoMap[category].erase(find(todoMap[category].begin(), todoMap[category].end(), token));
+		save(fileName, todoMap);
+		break;
+	}
+	}
+
 	return 0;
 }
 
-
-/******* Implementation. *********/
-void addTodoItem(const string &fileName, const string &category)
-{
-	ifstream input(fileName.c_str());
-
-	if (!input) {
-		cerr << "Coldn't open file " << fileName << endl;
-	}
-
-	string addItem = "";
-	cout << "Enter item name:" << endl;
-	cin >> addItem;
-
-	// Prevent adding '{' '}' symbols.
-	while (addItem.find("{") != string::npos || addItem.find("}") != string::npos) {
-		cout << "Please enter name with no '{' or '}' symbols." << endl;
-		addItem.erase();
-		cin >> addItem;
-	}
-
-	vector<string> *fileStrings = new vector<string>();
-	do {
-		// Find end of list.
-		string s;
-		getline(input, s);
-		size_t end = s.find("}");
-		size_t begin = s.find("{");
-		// Find corresponding category.
-		string currCat = s.substr(0, begin);
-		if (currCat != category) {
-			fileStrings->push_back(s);
-			continue;
-		}
-		size_t size = end - begin;
-		s.replace(end, 1, (size == 1 ? "" : " ") + addItem + "}");
-		fileStrings->push_back(s);
-	} while (input.good());
-	input.close();
-
-	// Write file.
-	ofstream output(fileName.c_str());
-	if (!output) {
-		cerr << "Coldn't open file " << fileName << endl;
-	}
-	for (int idx = 0; idx < fileStrings->size() - 1; ++idx) {
-		output << fileStrings->at(idx) << endl;
-	}
-	// Add last line without 'endl'.
-	output << fileStrings->at(fileStrings->size() - 1);
-	output.close();
-	delete fileStrings;
-}
-
-void getCategoryItems(const string &fileName, const string &category, vector<string> &items)
+void load(const string& fileName, TODOMap& todoMap)
 {
 	ifstream input(fileName.c_str());
 	if (!input) {
 		cerr << "Coldn't open file " << fileName << endl;
+		return;
 	}
 
 	do {
-		string s;
-		getline(input, s);
-		size_t begin = s.find("{") + 1;
-		if (begin <= 1) { continue; }
-		string currCat = s.substr(0, begin - 1);
+		std::string str;
+		getline(input, str);
+		std::istringstream iss(str);
+		std::string token;
 
-		// If not considering category or "" (any) category move forward.
-		if (category != "" && currCat != category) { continue; }
-		size_t size = s.find("}") - begin;
-		if (size <= 0) { continue; }
-
-		// Parse items string.
-		string itemsString = s.substr(begin, size);
-		size_t last = size - 1;
-		string item = "";
-		for (size_t i = 0; i < size; ++i) {
-			if (itemsString[i] == ' ' || i == last) {
-				if (i == last) { item.insert(item.size(), 1, itemsString[i]); }
-				items.push_back(item);
-				item.clear();
-			} else {
-				item.insert(item.size(), 1, itemsString[i]);
+		if (getline(iss, token, ':')) {
+			std::string title = token;
+			if (todoMap.find(token) == todoMap.end()) {
+				std::vector<std::string> items;
+				todoMap.insert(std::pair< std::string, std::vector<std::string> >(title, items));
+			}
+			if (getline(iss, token, ':')) {
+				std::istringstream subIss(token);
+				while (getline(subIss, token, '|'))
+					todoMap[title].push_back(token);
 			}
 		}
 	} while (input.good());
-}
-
-void removeTodoItem(const string &fileName, const string &category)
-{
-	ifstream input(fileName.c_str());
-
-	if (!input) {
-		cerr << "Coldn't open file " << fileName << endl;
-	}
-	cout << "Enter item to remove:" << endl;
-	string removeItem = "";
-	cin >> removeItem;
-	// Prevent adding '{' '}' symbols.
-	while (removeItem.find("{") != string::npos || removeItem.find("}") != string::npos) {
-		cout << "Please enter name with no '{' or '}' symbols." << endl;
-		removeItem.erase();
-		cin >> removeItem;
-	}
-
-	vector<string> *fileStrings = new vector<string>();
-	do {
-		// Find end of list.
-		string s;
-		getline(input, s);
-		size_t end = s.find("}");
-		size_t begin = s.find("{");
-		string currCat = s.substr(0, begin);
-		size_t pos = s.find(removeItem);
-		if (pos == string::npos) {
-			fileStrings->push_back(s);
-			continue;
-		}
-		// Check, is current word fullength equal to considerred.
-		bool wholeWord = false;
-		size_t next = pos + removeItem.size();
-		if (next <= s.size()) {
-			if (s[next] != ' ' && s[next] != '}') {
-				fileStrings->push_back(s);
-				continue;
-			}
-		}
-
-		// Find corresponding category.
-		if (wholeWord && (currCat != category || pos < 0)) {
-			fileStrings->push_back(s);
-			continue;
-		}
-
-		s.replace(pos, removeItem.size(), "");
-		size_t tmp = string::npos;
-		while ((tmp = s.find("  ")) != string::npos) {
-			s.replace(tmp, 2, " ");
-		}
-		tmp = string::npos;
-		while ((tmp = s.find(" }")) != string::npos) {
-			s.replace(tmp, 2, "}");
-		}
-		tmp = string::npos;
-		while ((tmp = s.find("{ ")) != string::npos) {
-			s.replace(tmp, 2, "{");
-		}
-
-		fileStrings->push_back(s);
-	} while (input.good());
 	input.close();
 
-	// Write file.
-	ofstream output(fileName.c_str());
-	if (!output) {
-		cerr << "Coldn't open file " << fileName << endl;
-	}
-	for (int idx = 0; idx < fileStrings->size() - 1; ++idx) {
-		output << fileStrings->at(idx) << endl;
-	}
-	// Add last line without 'endl'.
-	output << fileStrings->at(fileStrings->size() - 1);
-	output.close();
-	delete fileStrings;
 }
 
-void showCategory(const string &fileName, const string &category)
+void save(const string& fileName, TODOMap& map)
 {
-	ifstream input(fileName.c_str());
+	ofstream output(fileName.c_str());
+	if (!output) {
+		cerr << "Coldn't open file to save " << fileName << endl;
+		return;
+	}
 
-	if (!input) { cerr << "Coldn't open file " << fileName << endl; }
-
-	do {
-		string s;
-		getline(input, s);
-		size_t pos = string::npos;	
-
-		if ((pos = s.find("{")) != string::npos) { cout << s.substr(0, pos) << endl; }
-	} while (input.good());
+	for (TODOIterator it = map.begin(); it != map.end(); ++it) {
+		output << (*it).first << ":";
+		for (std::vector<std::string>::const_iterator i = (*it).second.begin(); i != (*it).second.end(); ++i) {
+			if (i != (*it).second.begin())
+				output << "|";
+			output << (*i);
+		}
+		output << std::endl;
+	}
 }
